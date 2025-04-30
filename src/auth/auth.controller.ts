@@ -1,17 +1,17 @@
-import { Controller,  Post, Body, UnauthorizedException, HttpCode } from '@nestjs/common';
+// src/auth/auth.controller.ts
+import { Controller, Post, Body, UnauthorizedException, HttpCode, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
 import { 
   ApiTags, 
   ApiOperation, 
-  ApiResponse
-  
+  ApiResponse,
+  ApiBearerAuth
 } from '@nestjs/swagger';
 
 import { AuthService } from './auth.service';
-
 import { LoginDto } from '../dto/login.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
-
 import { UsersService } from '../users/users.service';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -22,6 +22,8 @@ export class AuthController {
   ) {}
 
   @Post('register')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ 
     status: 201, 
@@ -41,9 +43,18 @@ export class AuthController {
     }
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 409, description: 'Username or email already exists' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   async register(@Body() createUserDto: CreateUserDto) {
-    return this.authService.register(createUserDto);
+    try {
+      return await this.authService.register(createUserDto);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Error en el registro',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Post('login')
@@ -60,13 +71,21 @@ export class AuthController {
     }
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   async login(@Body() loginDto: LoginDto) {
-    const user = await this.authService.validateUser(loginDto.username, loginDto.password);
-    
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+    try {
+      const user = await this.authService.validateUser(loginDto.username, loginDto.password);
+      
+      if (!user) {
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
+      
+      return await this.authService.login(user);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Error en el inicio de sesión',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
-    
-    return this.authService.login(user);
   }
 }

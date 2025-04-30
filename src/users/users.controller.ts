@@ -1,10 +1,14 @@
-import { Controller, Get, Delete, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+// src/users/users.controller.ts
+import { Controller, Get, Delete, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { User } from './schemas/user.schema';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @ApiTags('Users')
 @Controller('users')
+@UseGuards(JwtAuthGuard) // Aplicar el guard a todas las rutas
+@ApiBearerAuth('access-token') // Usar el mismo nombre que definimos en main.ts
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -23,6 +27,7 @@ export class UsersController {
       },
     },
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserByUsername(@Param('username') username: string): Promise<User | null> {
     return this.usersService.findByUsername(username);
@@ -41,6 +46,7 @@ export class UsersController {
       },
     },
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async deleteUserByEmail(@Param('email') email: string) {
     return this.usersService.removeByEmail(email);
