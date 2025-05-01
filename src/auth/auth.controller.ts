@@ -1,5 +1,5 @@
 // src/auth/auth.controller.ts
-import { Controller, Post, Body, UnauthorizedException, HttpCode, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, HttpCode, UseGuards, HttpException, HttpStatus, Get, Req } from '@nestjs/common';
 import { 
   ApiTags, 
   ApiOperation, 
@@ -22,8 +22,6 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ 
     status: 201, 
@@ -43,7 +41,6 @@ export class AuthController {
     }
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 409, description: 'Username or email already exists' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async register(@Body() createUserDto: CreateUserDto) {
@@ -84,6 +81,48 @@ export class AuthController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Error en el inicio de sesión',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Post('refresh')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Token refreshed successfully',
+    schema: {
+      properties: {
+        access_token: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+        refresh_token: { type: 'string', example: 'abc123xyz456...' }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
+  async refreshToken(@Body() body: { refresh_token: string }) {
+    try {
+      return await this.authService.refreshToken(body.refresh_token);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Error al refrescar el token',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get user profile' })
+  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getProfile(@Req() req) {
+    try {
+      return await this.authService.getProfile(req.user);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Error al obtener el perfil',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
